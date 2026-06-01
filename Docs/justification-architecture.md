@@ -1,7 +1,7 @@
 # Justification d'architecture — SkillSwap
 
 **Document :** note technique pour le jury  
-**Projet :** SkillSwap — échange de compétences entre étudiants  
+**Projet :** SkillSwap — échange de compétences entre étudiants et formateurs (campus)  
 **Équipe :** G11  
 **Objectif :** expliquer et justifier les choix technologiques, en particulier une architecture **découplée** et **évolutive vers le mobile**, **sans serveur applicatif dédié** à maintenir par l’équipe.
 
@@ -25,7 +25,7 @@ Notre groupe retient une stack **moderne, orientée API et mobile**, adaptée au
 | Principe | Application sur SkillSwap |
 |----------|---------------------------|
 | **Pas de back « maison »** | Aucun serveur applicatif dédié à l’équipe ; Supabase héberge Postgres, Auth et Edge Functions. |
-| **Données et sécurité côté plateforme** | Schéma PostgreSQL + **RLS** (Row Level Security) : chaque étudiant n’accède qu’à ce qu’il a le droit de voir. |
+| **Données et sécurité côté plateforme** | Schéma PostgreSQL + **RLS** (Row Level Security) : chaque utilisateur (étudiant ou formateur) n’accède qu’à ce qu’il a le droit de voir, selon son `account_type` et son rôle sur la session. |
 | **Logique métier ciblée** | CRUD simple via l’API auto-générée Supabase ; règles complexes (matching, points, badges) via **Edge Functions** ou SQL (triggers / RPC). |
 | **Client unique pour le web** | React + shadcn consomme Supabase via `@supabase/supabase-js` — **un seul point d’accès** (`lib/supabase.ts`). |
 | **Mobile-first (UI)** | Composants shadcn + Tailwind responsive ; futur client mobile réutilise **le même projet Supabase**. |
@@ -82,10 +82,10 @@ flowchart TB
 
 | Service Supabase | Rôle sur SkillSwap |
 |------------------|-------------------|
-| **PostgreSQL** | Héberge le MPD (users, skills, sessions, badges, feedbacks). Enums Postgres pour `skill_level`, `session_status`, etc. |
-| **Supabase Auth** | Inscription / connexion (email académique, validation de domaine si besoin). JWT géré par Supabase. |
+| **PostgreSQL** | Héberge le MPD (`users`, `user_skills`, `sessions`, `session_co_hosts`, `session_registrations`, badges, feedbacks). Enums : `account_type`, `skill_level`, `session_status`, etc. |
+| **Supabase Auth** | Inscription / connexion (email académique, étudiants et formateurs). JWT géré par Supabase ; le type de compte est stocké en table `users`, pas dans `user_metadata`. |
 | **API auto (PostgREST)** | Exposition REST des tables filtrées par **RLS** — pas d’API à coder à la main pour le CRUD. |
-| **RLS** | Autorisation fine : un étudiant lit les profils publics, modifie uniquement le sien, s’inscrit aux sessions selon les règles définies. |
+| **RLS** | Autorisation fine : lecture des profils publics ; modification du profil propre ; création de session si hôte ; co-présentation via `session_co_hosts` (formateurs) ; inscription participant via `session_registrations`. |
 | **Edge Functions** | Logique serveur courte (Deno/TypeScript) : matching, attribution de points/badges, validations multi-tables, envoi d’emails optionnel. |
 | **Storage** (optionnel) | Avatars, icônes de badges (`icon_url`). |
 | **Realtime** (optionnel) | Mise à jour live des inscriptions à une session ou du feed. |
@@ -106,10 +106,10 @@ Le sujet demande une **base de données** et une **intégration technique** : Su
 
 | Besoin | Où ça vit | Exemple SkillSwap |
 |--------|-----------|-------------------|
-| Lire / écrire des lignes autorisées | **Client + RLS** | Liste des compétences, mise à jour de son profil |
-| Règles d’accès par utilisateur | **Politiques RLS** | Seul l’hôte peut modifier sa session |
-| Calculs, agrégations, workflows | **Edge Function** ou **RPC SQL** | Suggestions de matching, +10 points après session |
-| Authentification | **Supabase Auth** | Connexion email campus |
+| Lire / écrire des lignes autorisées | **Client + RLS** | Liste des compétences, mise à jour de son profil (`user_skills`) |
+| Règles d’accès par utilisateur | **Politiques RLS** | Hôte modifie sa session ; formateur insère dans `session_co_hosts` ; participant via `session_registrations` |
+| Calculs, agrégations, workflows | **Edge Function** ou **RPC SQL** | Matching, +10 points, validation co-présentateur (pas hôte, pas déjà inscrit) |
+| Authentification | **Supabase Auth** | Connexion email campus (étudiant ou formateur) |
 | Fichiers | **Supabase Storage** | Photo de profil, badge |
 
 > **Règle d’équipe :** le frontend **ne contient jamais** la clé `service_role`. Seule la clé **publishable** (ex-anon) est dans le client ; les Edge Functions utilisent le contexte auth de l’utilisateur ou la clé service **côté serveur Supabase uniquement**.
@@ -120,7 +120,7 @@ Le sujet demande une **base de données** et une **intégration technique** : Su
 
 ### 5.1 Ce que fait le frontend (client)
 
-- UI : écrans profil, recherche, sessions, gamification, feedbacks (shadcn).
+- UI : écrans profil (étudiant / formateur), recherche, sessions (création, co-présentation, inscription), gamification, feedbacks (shadcn).
 - Appels `supabase.from('sessions').select(...)` pour les lectures/écritures autorisées par RLS.
 - `supabase.functions.invoke('match-students', { body })` pour la logique métier complexe.
 - Gestion de session auth (`getSession`, `onAuthStateChange`).
@@ -132,10 +132,12 @@ Le sujet demande une **base de données** et une **intégration technique** : Su
 - Application des **politiques RLS** (impossible de contourner depuis le client sans token valide).
 - Exécution des **Edge Functions** pour les traitements qui ne doivent pas être dupliqués dans chaque client.
 
-### 5.3 Exemple de flux (création de session)
+### 5.3 Exemples de flux
+
+#### Création de session (étudiant ou formateur hôte)
 
 ```typescript
-// 1. Client — insertion autorisée si RLS : host_id = auth.uid()
+// RLS : host_id = auth.uid() — étudiant « enseignant d'un jour » ou formateur
 const { data, error } = await supabase
   .from('sessions')
   .insert({
@@ -150,13 +152,36 @@ const { data, error } = await supabase
   .select()
   .single();
 
-// 2. Edge Function (optionnel) — notification ou validation métier
 await supabase.functions.invoke('notify-session-created', {
   body: { sessionId: data.id },
 });
 ```
 
-Le site web et une future app mobile exécutent **le même code d’intégration** (SDK Supabase) ; seul le rendu UI change.
+#### Formateur — rejoindre en co-présentateur
+
+```typescript
+// RLS : account_type = Formateur, user_id ≠ host_id, pas déjà inscrit participant
+const { error } = await supabase.from('session_co_hosts').insert({
+  session_id: sessionId,
+  user_id: user.id,
+});
+
+// Ou via Edge Function pour centraliser les contrôles d'exclusivité
+await supabase.functions.invoke('join-session-as-co-host', {
+  body: { sessionId },
+});
+```
+
+#### Formateur ou étudiant — assister à une session
+
+```typescript
+// Même table session_registrations pour tous les participants « apprenants »
+await supabase.functions.invoke('register-to-session', {
+  body: { sessionId },
+});
+```
+
+Le site web et une future app mobile exécutent **le même code d’intégration** (SDK Supabase) ; seul le rendu UI change (ex. bouton « Co-animer » visible si `account_type === 'Formateur'`).
 
 ### 5.4 Bénéfices pour le jury
 
@@ -177,10 +202,11 @@ Les **Edge Functions** portent la logique serveur pour les cas où le client ne 
 
 | Fonction (exemple) | Déclencheur | Rôle |
 |------------------|-------------|------|
-| `match-students` | Recherche de binômes | Algorithme de matching selon compétences / niveaux / dispos |
+| `match-students` | Recherche de binômes | Matching selon compétences / niveaux / dispos (étudiants et formateurs) |
 | `award-session-points` | Fin de session | Mise à jour `points`, déblocage badge |
-| `register-to-session` | Inscription | Vérifier `max_participants`, éviter les doublons |
-| `validate-academic-email` | Inscription | Restreindre au domaine `@ecole.fr` (si configuré) |
+| `register-to-session` | Inscription participant | Vérifier `max_participants`, pas déjà hôte ni co-présentateur |
+| `join-session-as-co-host` | Co-présentation | Formateur uniquement ; vérifie `host_id ≠ auth.uid()`, pas déjà dans `session_registrations` |
+| `validate-academic-email` | Inscription | Restreindre au domaine `@ecole.fr` (si configuré) ; type de compte à l'inscription |
 
 **Avantages pour SkillSwap :**
 
@@ -200,17 +226,32 @@ Conformément aux bonnes pratiques Supabase :
 
 1. **RLS activé** sur toutes les tables du schéma `public`.
 2. Politiques explicites : `SELECT` / `INSERT` / `UPDATE` / `DELETE` selon `auth.uid()`.
-3. **Ne jamais** baser l’autorisation sur `user_metadata` (modifiable par l’utilisateur) ; profils et rôles dans des **tables applicatives** liées à `auth.users`.
+3. **Ne jamais** baser l’autorisation sur `user_metadata` (modifiable par l’utilisateur) ; `account_type` (Étudiant / Formateur) et droits session dans la table **`users`** et les policies RLS associées.
 4. Clé **publishable** uniquement dans le frontend ; `service_role` réservée aux Edge Functions si nécessaire.
 5. **UPDATE** : penser à une policy `SELECT` associée (sinon les updates échouent silencieusement sous RLS).
 
-Exemple de intention (schéma simplifié) :
+Exemples d’intention (schéma simplifié) :
 
 ```sql
--- Un étudiant ne modifie que son propre profil
+-- Un utilisateur ne modifie que son propre profil
 CREATE POLICY "users_update_own"
-  ON public.profiles FOR UPDATE
+  ON public.users FOR UPDATE
   USING (auth.uid() = id);
+
+-- Co-présentation : réservée aux formateurs, pas l'hôte de la session
+CREATE POLICY "co_hosts_insert_formateur"
+  ON public.session_co_hosts FOR INSERT
+  WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (
+      SELECT 1 FROM public.users u
+      WHERE u.id = auth.uid() AND u.account_type = 'Formateur'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM public.sessions s
+      WHERE s.id = session_id AND s.host_id = auth.uid()
+    )
+  );
 ```
 
 ---
@@ -221,11 +262,12 @@ Nous utilisons **shadcn/ui** comme catalogue de composants (`components/ui/`), e
 
 | Fonctionnalité SkillSwap | Composants shadcn | Rôle |
 |--------------------------|-------------------|------|
-| Inscription / connexion | `Form`, `Input`, `Button` | Email académique via Supabase Auth |
-| Profil étudiant | `Card`, `Avatar`, `Badge`, `Textarea` | Compétences, niveaux, disponibilités |
+| Inscription / connexion | `Form`, `Input`, `Button`, `RadioGroup` | Email académique ; choix **Étudiant** / **Formateur** |
+| Profil utilisateur | `Card`, `Avatar`, `Badge`, `Textarea` | `user_skills`, niveaux, disponibilités (étudiants et formateurs) |
 | Recherche / matching | `Command`, `Select`, `Tabs` | Filtres ; résultats issus de Supabase |
-| Création de session | `Dialog` / `Sheet`, `Calendar` | Insert `sessions` + RLS |
-| Liste des sessions | `Card`, `Badge` | Statuts planifiée / en cours / terminée |
+| Création de session | `Dialog` / `Sheet`, `Calendar` | Insert `sessions` + RLS (`host_id`) |
+| Co-présentation | `Button`, `Alert` | Insert `session_co_hosts` (formateurs) |
+| Liste des sessions | `Card`, `Badge` | Hôte, co-présentateurs, statut, places restantes |
 | Gamification | `Badge`, `Progress` | Points et badges (`user_badges`) |
 | Feed / feedback | `Card`, `Textarea` | Table `feedbacks` |
 | Navigation mobile | `Sheet`, `NavigationMenu` | UX au pouce |
@@ -238,7 +280,7 @@ src/
 ├── features/
 │   ├── auth/
 │   ├── profile/
-│   ├── sessions/
+│   ├── sessions/          # création, inscription, co-hosts
 │   └── matching/
 ├── lib/
 │   └── supabase.ts      # Client Supabase — seul point d’accès données
@@ -288,7 +330,9 @@ timeline
 
 - Le **MPD relationnel** (cf. `Docs/shema mcp_database.md`) est implémenté en **migrations Supabase** (PostgreSQL).
 - Les enums du MPD deviennent des **types ENUM Postgres** ou des `CHECK` constraints.
-- `auth.users` (Supabase) est lié à une table `profiles` (ex. `id UUID REFERENCES auth.users`).
+- `auth.users` (Supabase) est lié à la table `users` / `profiles` (ex. `id UUID REFERENCES auth.users`) avec le champ **`account_type`** (`Étudiant` | `Formateur`).
+- Table **`user_skills`** (remplace `student_skills`) pour les compétences des deux types de comptes.
+- Table **`session_co_hosts`** pour les formateurs co-présentateurs.
 - L’API REST est **générée automatiquement** à partir des tables ; les Edge Functions complètent les cas complexes.
 
 ---

@@ -1,7 +1,7 @@
 # Fiche d'analyse des besoins — Compétences techniques & soft skills
 
 **Document :** livrable Jour 1 — analyse des besoins en compétences  
-**Projet :** SkillSwap — échange de compétences entre étudiants (campus)  
+**Projet :** SkillSwap — échange de compétences entre étudiants et formateurs (campus)  
 **Équipe :** G11  
 **Références :** `Docs/justification-architecture.md`, `Docs/shema mcp_database.md`, sujet workshop SkillSwap
 
@@ -26,10 +26,12 @@ Elle sert à :
 
 | Domaine fonctionnel (brief) | Besoin technique associé | Criticité |
 |----------------------------|--------------------------|-----------|
-| Profil étudiant (compétences, niveaux, dispos) | Modélisation relationnelle, CRUD sécurisé, formulaires complexes, JSON | **Indispensable** |
-| Auth email académique (réseau de confiance) | Supabase Auth, validation domaine, gestion session JWT | **Indispensable** |
+| Profil étudiant / formateur (compétences, niveaux, dispos) | `account_type`, table `user_skills`, formulaires, JSON | **Indispensable** |
+| Auth email académique (réseau de confiance) | Supabase Auth, inscription Étudiant vs Formateur, JWT | **Indispensable** |
 | Recherche & matching par catégories | Requêtes filtrées, index SQL, Edge Function de matching | **Indispensable** |
-| Sessions (ateliers, cours, clubs) | CRUD sessions, statuts, contraintes d'inscription | **Indispensable** |
+| Sessions (ateliers, cours, clubs) | CRUD `sessions`, `session_co_hosts`, `session_registrations` | **Indispensable** |
+| Formateur co-présentateur | RLS par rôle, Edge Function `join-session-as-co-host`, exclusivité hôte/inscrit | **Indispensable** |
+| Formateur participant (comme élève) | Même flux `session_registrations`, UI conditionnelle | **Indispensable** |
 | Gamification (points, badges) | Triggers SQL ou Edge Functions, règles métier atomiques | **Indispensable** |
 | Feed / feedbacks entre pairs | Relations N-N, modération implicite via RLS | **Important** |
 | Évolutivité mobile | API/SDK unique, RLS côté serveur, UI responsive | **Indispensable** |
@@ -60,13 +62,13 @@ Les compétences ci-dessous sont classées par **domaine**, avec un **niveau min
 
 | Compétence | Description | Niveau min. | Justification SkillSwap |
 |------------|-------------|-------------|-------------------------|
-| **Modélisation relationnelle (MPD)** | Tables, FK, enums, cardinalités | Autonome | 8 entités : users, skills, sessions, badges, feedbacks… |
+| **Modélisation relationnelle (MPD)** | Tables, FK, enums, cardinalités | Autonome | 9 entités + `session_co_hosts` ; `account_type`, `user_skills` |
 | **SQL PostgreSQL** | `SELECT`, `JOIN`, `INSERT`, contraintes, enums | Autonome | Migrations, seeds compétences, requêtes métier |
 | **Migrations Supabase** | Fichiers SQL versionnés, `supabase db push` | Notions → Autonome | Implémentation du MPD en environnement partagé |
 | **Supabase Auth** | Inscription, connexion, `auth.uid()`, sessions | Autonome | US 01 — email académique |
-| **Row Level Security (RLS)** | Policies `SELECT`/`INSERT`/`UPDATE`/`DELETE` | Autonome | Sécurité pair-à-pair ; non négociable |
+| **Row Level Security (RLS)** | Policies par rôle (`account_type`, hôte, co-host, participant) | Autonome | Étudiants + formateurs ; règles session non négociables |
 | **PostgREST / API auto** | Exposition tables, filtres, relations | Notions → Autonome | CRUD profil, sessions, inscriptions |
-| **Edge Functions (Deno/TS)** | `serve`, validation, appels DB service role | Notions → Autonome | Matching (US 04), points/badges (US 07), inscription (US 06) |
+| **Edge Functions (Deno/TS)** | `serve`, validation, appels DB service role | Notions → Autonome | Matching, points/badges, inscription, **co-présentation formateur** (US 05b) |
 | **Triggers / RPC SQL** | `updated_at`, compteurs, règles simples | Notions | Alternative aux Edge Functions pour règles atomiques |
 | **Supabase Storage** (optionnel) | Buckets, policies, URLs signées | Notions | Avatars, icônes badges |
 | **Realtime** (optionnel) | Subscriptions sur tables | Notions | Feed live, places restantes sur une session |
@@ -90,7 +92,8 @@ Les compétences ci-dessous sont classées par **domaine**, avec un **niveau min
 |------------|-------------|-------------|-------------------------|
 | **Architecture découplée (client / API / données)** | Séparation UI, règles serveur, persistance | Autonome | Contrainte jury : mobile-ready |
 | **REST & ressources** | Verbes HTTP, codes statut, idempotence | Notions → Autonome | API PostgREST + Edge Functions |
-| **Sécurité web de base** | XSS, CSRF (contexte SPA), auth par token | Notions → Autonome | Données étudiants, feedbacks |
+| **Sécurité web de base** | XSS, CSRF (contexte SPA), auth par token | Notions → Autonome | Données étudiants/formateurs, feedbacks |
+| **RBAC / rôles applicatifs** | `account_type`, droits différents sur les sessions | Notions → Autonome | Formateur : hôte, co-présentateur ou participant |
 | **Accessibilité (a11y)** | Labels, focus, contrastes (Radix/shadcn) | Notions | Profils variés sur campus |
 | **Préparation mobile** | Réutilisation SDK, même schéma RLS | Notions | Phase 2 React Native / Expo |
 
@@ -109,12 +112,14 @@ Les compétences ci-dessous sont classées par **domaine**, avec un **niveau min
 
 | US | Intitulé | Compétences techniques clés |
 |----|----------|----------------------------|
-| **US 01** | Connexion email académique | Supabase Auth, React forms, RLS sur `profiles` |
-| **US 02** | Profil (compétences, niveaux, dispos) | SQL / JSON, shadcn Form, multi-select, RLS update own |
+| **US 01** | Connexion email académique | Supabase Auth, React forms, RLS sur `users` |
+| **US 01b** | Compte formateur | `account_type`, inscription dédiée, policies RLS formateur |
+| **US 02** | Profil (compétences, niveaux, dispos) | `user_skills`, SQL / JSON, shadcn Form, RLS update own |
 | **US 03** | Recherche par catégories | SQL `WHERE`, filtres UI, index sur `skills.category` |
-| **US 04** | Matching automatique | Edge Function, algorithme de scoring, TypeScript |
-| **US 05** | Création de session | Insert `sessions`, enums, Calendar/Dialog shadcn |
-| **US 06** | Inscription à une session | RLS, contrainte `max_participants`, Edge Function optionnelle |
+| **US 04** | Matching automatique | Edge Function, scoring (étudiants + formateurs) |
+| **US 05** | Création de session (étudiant ou formateur) | Insert `sessions` (`host_id`), enums, Calendar/Dialog |
+| **US 05b** | Co-présentation formateur | Insert `session_co_hosts`, Edge Function, UI conditionnelle |
+| **US 06** | Inscription participant | `session_registrations`, `max_participants`, exclusivité co-host |
 | **US 07** | Points & badges | Trigger ou Edge Function, tables `badges` / `user_badges` |
 | **US 08** | Feedback écrit | Insert `feedbacks`, validation note 1–5, Card/Textarea |
 
@@ -138,8 +143,8 @@ Pour une équipe de **5 à 6 personnes** avec stack **React + Supabase**, répar
 | Activité | Lead tech | Front | Supabase | MOA | SM |
 |----------|-----------|-------|----------|-----|-----|
 | Schéma BDD + migrations | **A** | C | **R** | I | I |
-| Policies RLS | **A** | I | **R** | C | I |
-| Edge Functions (matching, points) | **A** | C | **R** | I | I |
+| Policies RLS (dont formateurs) | **A** | I | **R** | C | I |
+| Edge Functions (matching, co-host, points) | **A** | C | **R** | I | I |
 | Écrans React (features) | C | **R** | I | C | I |
 | Auth & profil | C | **R** | **R** | C | I |
 | Déploiement & doc technique | **A** | **R** | C | I | C |
@@ -171,8 +176,8 @@ Pour une équipe de **5 à 6 personnes** avec stack **React + Supabase**, répar
 
 | Compétence | Niveau requis | Niveau actuel équipe (1–3) | Écart | Action |
 |------------|---------------|----------------------------|-------|--------|
-| RLS PostgreSQL | Autonome | _à remplir_ | | Pairing avec lead / tuto Supabase RLS |
-| Edge Functions Deno | Notions → Autonome | _à remplir_ | | PoC `match-students` en 2 h |
+| RLS PostgreSQL (multi-rôles) | Autonome | _à remplir_ | | PoC policies `session_co_hosts` |
+| Edge Functions Deno | Notions → Autonome | _à remplir_ | | PoC `join-session-as-co-host` |
 | shadcn/ui | Autonome | _à remplir_ | | Copier patterns doc officielle |
 | TanStack Query | Notions → Autonome | _à remplir_ | | 1 écran pilote (liste sessions) |
 | … | | | | |
@@ -198,7 +203,7 @@ Pour une équipe de **5 à 6 personnes** avec stack **React + Supabase**, répar
 | Jour | Focus compétences | Livrable associé |
 |------|-------------------|------------------|
 | **Jour 1** | Git, Supabase projet, schéma + RLS de base, init React/shadcn | Ce document, Trello, note architecture |
-| **Jour 2** | Features cœur (auth, profil, sessions), Edge Function matching | Budget technique, RACI à jour |
+| **Jour 2** | Auth (étudiant/formateur), profil, sessions, co-présentation, matching | Budget technique, RACI à jour |
 | **Jour 3** | Gamification, feedbacks, déploiement, doc workflows | Guide technique, note flux MOA/MOE |
 
 **Ressources prioritaires :**
@@ -214,9 +219,9 @@ Pour une équipe de **5 à 6 personnes** avec stack **React + Supabase**, répar
 
 Pour livrer SkillSwap avec la stack **React + Supabase** dans le délai du workshop, l'équipe doit disposer au minimum de :
 
-1. **Un référent data/sécurité** maîtrisant **PostgreSQL + RLS + Auth** — sans quoi les données étudiants ne sont pas protégées correctement.  
-2. **Un ou deux développeurs frontend** autonomes sur **React, TypeScript et intégration SDK** — pour couvrir les 8 user stories côté interface.  
-3. **Des notions solides en Edge Functions** pour le **matching** et la **gamification** — logique métier non déléguable au seul client.  
+1. **Un référent data/sécurité** maîtrisant **PostgreSQL + RLS multi-rôles + Auth** — dont les droits **formateur** (hôte, co-présentateur, participant).  
+2. **Un ou deux développeurs frontend** autonomes sur **React, TypeScript et intégration SDK** — parcours conditionnels selon `account_type` (US 01b, 05b, 06).  
+3. **Des notions solides en Edge Functions** pour le **matching**, la **co-présentation** et la **gamification** — règles d'exclusivité non déléguables au seul client.  
 4. **Des soft skills de pilotage Agile** — Trello, CR, communication client — au même titre que les compétences code.
 
 Les compétences **PHP/Symfony ou CMS** mentionnées dans le sujet générique ne sont **pas requises** pour G11 : elles ont été écartées au profit d'une stack API-first et mobile-ready, comme documenté dans la note d'architecture.
