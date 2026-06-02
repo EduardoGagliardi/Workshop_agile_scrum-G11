@@ -26,7 +26,7 @@ Notre groupe retient une stack **moderne, orientée API et mobile**, adaptée au
 |----------|---------------------------|
 | **Pas de back « maison »** | Aucun serveur applicatif dédié à l’équipe ; Supabase héberge Postgres, Auth et Edge Functions. |
 | **Données et sécurité côté plateforme** | Schéma PostgreSQL + **RLS** (Row Level Security) : chaque utilisateur (étudiant ou formateur) n’accède qu’à ce qu’il a le droit de voir, selon son `account_type` et son rôle sur la session. |
-| **Logique métier ciblée** | CRUD simple via l’API auto-générée Supabase ; règles complexes (matching, points, badges) via **Edge Functions** ou SQL (triggers / RPC). |
+| **Logique métier ciblée** | CRUD simple via l’API auto-générée Supabase ; règles complexes (matching, XP, niveaux, badges) via **Edge Functions** ou SQL (triggers / RPC). |
 | **Client unique pour le web** | React + shadcn consomme Supabase via `@supabase/supabase-js` — **un seul point d’accès** (`lib/supabase.ts`). |
 | **Mobile-first (UI)** | Composants shadcn + Tailwind responsive ; futur client mobile réutilise **le même projet Supabase**. |
 | **Évolutivité** | Web et mobile = **deux interfaces**, **une même base**, **mêmes règles** (RLS + Edge Functions). |
@@ -82,11 +82,11 @@ flowchart TB
 
 | Service Supabase | Rôle sur SkillSwap |
 |------------------|-------------------|
-| **PostgreSQL** | Héberge le MPD (`users`, `user_skills`, `sessions`, `session_co_hosts`, `session_registrations`, badges, feedbacks). Enums : `account_type`, `skill_level`, `session_status`, etc. |
+| **PostgreSQL** | Héberge le MPD (`users`, `user_skills`, `sessions`, `session_co_hosts`, `session_registrations`, XP/niveaux, badges, feedbacks). Enums : `account_type`, `skill_level`, `session_status`, etc. |
 | **Supabase Auth** | Inscription / connexion (email académique, étudiants et formateurs). JWT géré par Supabase ; le type de compte est stocké en table `users`, pas dans `user_metadata`. |
 | **API auto (PostgREST)** | Exposition REST des tables filtrées par **RLS** — pas d’API à coder à la main pour le CRUD. |
 | **RLS** | Autorisation fine : lecture des profils publics ; modification du profil propre ; création de session si hôte ; co-présentation via `session_co_hosts` (formateurs) ; inscription participant via `session_registrations`. |
-| **Edge Functions** | Logique serveur courte (Deno/TypeScript) : matching, attribution de points/badges, validations multi-tables, envoi d’emails optionnel. |
+| **Edge Functions** | Logique serveur courte (Deno/TypeScript) : matching, attribution d'XP/niveaux/badges, validations multi-tables, envoi d’emails optionnel. |
 | **Storage** (optionnel) | Avatars, icônes de badges (`icon_url`). |
 | **Realtime** (optionnel) | Mise à jour live des inscriptions à une session ou du feed. |
 
@@ -108,7 +108,7 @@ Le sujet demande une **base de données** et une **intégration technique** : Su
 |--------|-----------|-------------------|
 | Lire / écrire des lignes autorisées | **Client + RLS** | Liste des compétences, mise à jour de son profil (`user_skills`) |
 | Règles d’accès par utilisateur | **Politiques RLS** | Hôte modifie sa session ; formateur insère dans `session_co_hosts` ; participant via `session_registrations` |
-| Calculs, agrégations, workflows | **Edge Function** ou **RPC SQL** | Matching, +10 points, validation co-présentateur (pas hôte, pas déjà inscrit) |
+| Calculs, agrégations, workflows | **Edge Function** ou **RPC SQL** | Matching, ajout d'XP et recalcul du niveau, validation co-présentateur (pas hôte, pas déjà inscrit) |
 | Authentification | **Supabase Auth** | Connexion email campus (étudiant ou formateur) |
 | Fichiers | **Supabase Storage** | Photo de profil, badge |
 
@@ -183,7 +183,18 @@ await supabase.functions.invoke('register-to-session', {
 
 Le site web et une future app mobile exécutent **le même code d’intégration** (SDK Supabase) ; seul le rendu UI change (ex. bouton « Co-animer » visible si `account_type === 'Formateur'`).
 
-### 5.4 Bénéfices pour le jury
+### 5.4 Règle XP / niveaux
+
+La progression utilisateur est une règle métier partagée par le web et le futur mobile :
+
+- chaque profil commence au **niveau 1** avec **0 XP** ;
+- le passage du niveau 1 au niveau 2 demande **500 XP** ;
+- chaque niveau ajoute **+500 XP** au seuil suivant : niveau 2 → 3 = **1000 XP**, niveau 3 → 4 = **1500 XP** ;
+- la formule du seuil est `niveau_actuel * 500 XP`.
+
+Cette règle doit être appliquée côté Supabase (Edge Function, RPC ou trigger) pour que l'interface affiche seulement l'état calculé (`experience_points`, `level`, progression vers le prochain niveau) sans dupliquer la logique métier.
+
+### 5.5 Bénéfices pour le jury
 
 | Bénéfice | Détail |
 |----------|--------|
@@ -203,7 +214,7 @@ Les **Edge Functions** portent la logique serveur pour les cas où le client ne 
 | Fonction (exemple) | Déclencheur | Rôle |
 |------------------|-------------|------|
 | `match-students` | Recherche de binômes | Matching selon compétences / niveaux / dispos (étudiants et formateurs) |
-| `award-session-points` | Fin de session | Mise à jour `points`, déblocage badge |
+| `award-session-experience` | Fin de session | Mise à jour `experience_points`, recalcul de `level`, déblocage badge |
 | `register-to-session` | Inscription participant | Vérifier `max_participants`, pas déjà hôte ni co-présentateur |
 | `join-session-as-co-host` | Co-présentation | Formateur uniquement ; vérifie `host_id ≠ auth.uid()`, pas déjà dans `session_registrations` |
 | `validate-academic-email` | Inscription | Restreindre au domaine `@ecole.fr` (si configuré) ; type de compte à l'inscription |
