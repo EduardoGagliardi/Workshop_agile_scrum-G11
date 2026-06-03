@@ -1,4 +1,5 @@
 import { IonIcon } from '../../shared/IonIcon'
+import { ThemeToggleButton } from '../../shared/ThemeToggleButton'
 import type { UserProfile } from '../../types'
 
 type AppHeaderProps = {
@@ -21,6 +22,7 @@ export function AppHeader({ user, onOpenSheet }: AppHeaderProps) {
       </label>
 
       <div className="header-actions">
+        <ThemeToggleButton />
         <button
           type="button"
           className="icon-button"
