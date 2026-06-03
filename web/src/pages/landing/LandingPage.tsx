@@ -15,7 +15,7 @@ const landingLinks = [
 
 const howItWorksSteps = [
   {
-    icon: 'person-add-outline'
+    icon: 'person-add-outline',
     title: '1. Créez votre profil',
     description: 'Inscrivez-vous et ajoutez vos compétences et intérêts.',
   },
