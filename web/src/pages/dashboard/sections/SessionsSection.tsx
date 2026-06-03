@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../../lib/supabaseClient'
 import { IonIcon } from '../../../shared/IonIcon'
 import type { UserProfile } from '../../../types'
+import { SessionDashboardSection } from './SessionDashboardSection'
 
 type SessionRow = {
   id: string
@@ -47,9 +48,14 @@ function formatDate(iso: string) {
   })
 }
 
-type Props = { user: UserProfile }
+type Props = {
+  user: UserProfile
+  onViewProfile: (userId: string) => void
+  onOpenMessages: (targetUserId: string) => void
+}
 
-export function SessionsSection({ user }: Props) {
+export function SessionsSection({ user, onViewProfile, onOpenMessages }: Props) {
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [tab, setTab] = useState<'hosted' | 'registered'>('hosted')
   const [hostedSessions, setHostedSessions] = useState<SessionRow[]>([])
   const [registeredSessions, setRegisteredSessions] = useState<SessionRow[]>([])
@@ -124,6 +130,18 @@ export function SessionsSection({ user }: Props) {
   }
 
   const sessions = tab === 'hosted' ? hostedSessions : registeredSessions
+
+  if (selectedSessionId) {
+    return (
+      <SessionDashboardSection
+        sessionId={selectedSessionId}
+        user={user}
+        onBack={() => setSelectedSessionId(null)}
+        onViewProfile={onViewProfile}
+        onOpenMessages={onOpenMessages}
+      />
+    )
+  }
 
   return (
     <div className="section-page">
@@ -212,7 +230,19 @@ export function SessionsSection({ user }: Props) {
       ) : (
         <div className="sessions-grid">
           {sessions.map(session => (
-            <article key={session.id} className="session-card dashboard-card">
+            <article
+              key={session.id}
+              className="session-card dashboard-card session-card-clickable"
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedSessionId(session.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  setSelectedSessionId(session.id)
+                }
+              }}
+            >
               <div className="session-card-header">
                 <span className="session-type-badge">{session.type}</span>
                 <span className={`status-badge status-${session.status.replace(' ', '-').toLowerCase()}`}>
@@ -234,6 +264,9 @@ export function SessionsSection({ user }: Props) {
                   {session.session_registrations.length} / {session.max_participants} participants
                 </span>
               </div>
+              <p className="session-card-cta">
+                <IonIcon iconName="arrow-forward-outline" /> Ouvrir l'espace session
+              </p>
             </article>
           ))}
         </div>

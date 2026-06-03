@@ -63,7 +63,15 @@ export function DashboardContent({
     )
   }
 
-  if (activeSectionId === 'sessions') return <SessionsSection user={user} />
+  if (activeSectionId === 'sessions') {
+    return (
+      <SessionsSection
+        user={user}
+        onViewProfile={onViewProfile}
+        onOpenMessages={onOpenMessages}
+      />
+    )
+  }
   if (activeSectionId === 'skills') return <SkillsSection user={user} />
   if (activeSectionId === 'search') return <SearchSection onViewProfile={onViewProfile} />
   if (activeSectionId === 'messages') {

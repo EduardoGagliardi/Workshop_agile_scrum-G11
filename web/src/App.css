@@ -2274,6 +2274,171 @@ ol {
   gap: 0.35rem;
 }
 
+.session-card-clickable {
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.session-card-clickable:hover {
+  border-color: var(--blue);
+  box-shadow: 0 4px 16px rgba(77, 139, 255, 0.12);
+}
+
+.session-card-cta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.75rem 0 0;
+  color: var(--blue);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* ─── Session dashboard ─────────────────────────────────────── */
+.session-dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.session-dashboard-description {
+  margin: 0.5rem 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.session-dashboard-tabs .tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.session-dashboard-panel {
+  padding: 1.25rem;
+}
+
+.session-dashboard-hint {
+  margin: 0 0 1rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.session-participants-list,
+.session-files-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.session-participant-row,
+.session-file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--soft-surface);
+}
+
+.session-participant-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.session-participant-main:hover strong {
+  color: var(--blue);
+}
+
+.session-participant-main div {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.session-participant-main span {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.session-participant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.session-file-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--blue-light);
+  color: var(--blue);
+  flex-shrink: 0;
+}
+
+.session-file-info {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.session-file-info span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.session-dashboard-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+}
+
+.session-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 360px;
+  padding: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.bubble-sender {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-weight: 700;
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+
+.danger-text {
+  color: #c0392b;
+}
+
+[data-theme='dark'] .danger-text {
+  color: #ff8a7a;
+}
+
 /* ─── Status badges ─────────────────────────────────────────── */
 .status-badge {
   padding: 0.2rem 0.6rem;
