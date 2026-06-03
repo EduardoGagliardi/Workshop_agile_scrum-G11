@@ -1,19 +1,22 @@
-import { currentUser, messages, notifications } from '../../data/skillSwapData'
 import { IonIcon } from '../../shared/IonIcon'
+import type { UserProfile } from '../../types'
 
 type AppHeaderProps = {
+  user: UserProfile
   onOpenSheet: (sheetName: 'messages' | 'notifications') => void
 }
 
-export function AppHeader({ onOpenSheet }: AppHeaderProps) {
+export function AppHeader({ user, onOpenSheet }: AppHeaderProps) {
+  const initials = user.firstName.charAt(0).toUpperCase() + user.lastName.charAt(0).toUpperCase()
+
   return (
     <header className="app-header">
       <label className="global-search">
         <IonIcon iconName="search-outline" />
         <input
           type="search"
-          placeholder="Search for a skill, session, or student..."
-          aria-label="Search skills, sessions, and students"
+          placeholder="Rechercher une compétence, session ou étudiant…"
+          aria-label="Rechercher compétences, sessions et étudiants"
         />
       </label>
 
@@ -21,32 +24,34 @@ export function AppHeader({ onOpenSheet }: AppHeaderProps) {
         <button
           type="button"
           className="icon-button"
-          aria-label="Open notifications"
+          aria-label="Ouvrir les notifications"
           onClick={() => onOpenSheet('notifications')}
         >
           <IonIcon iconName="notifications-outline" />
-          <span>{notifications.length}</span>
         </button>
         <button
           type="button"
           className="icon-button"
-          aria-label="Open messages"
+          aria-label="Ouvrir les messages"
           onClick={() => onOpenSheet('messages')}
         >
           <IonIcon iconName="chatbox-ellipses-outline" />
-          <span>{messages.length}</span>
         </button>
         <article className="user-summary-card">
-          <img
-            className="profile-avatar"
-            src={currentUser.avatarUrl}
-            alt={`${currentUser.firstName} ${currentUser.lastName}`}
-          />
+          {user.avatarUrl ? (
+            <img
+              className="profile-avatar"
+              src={user.avatarUrl}
+              alt={`${user.firstName} ${user.lastName}`}
+            />
+          ) : (
+            <div className="profile-avatar profile-avatar-initials" style={{ fontSize: '0.75rem' }}>
+              {initials}
+            </div>
+          )}
           <div>
-            <strong>
-              {currentUser.firstName} {currentUser.lastName}
-            </strong>
-            <span>Level {currentUser.level}</span>
+            <strong>{user.firstName} {user.lastName}</strong>
+            <span>Niveau {user.level}</span>
           </div>
           <IonIcon iconName="chevron-down-outline" />
         </article>

@@ -1,20 +1,24 @@
-import { badges, currentUser, navigationSections, type DashboardSectionId } from '../../data/skillSwapData'
+import logo from '../../assets/logo.png'
+import { navigationSections, type DashboardSectionId } from '../../data/skillSwapData'
 import { IonIcon } from '../../shared/IonIcon'
+import type { UserProfile } from '../../types'
+import { xpProgress } from '../../types'
 
 type AppSidebarProps = {
+  user: UserProfile
   activeSectionId: DashboardSectionId
   onSectionChange: (sectionId: DashboardSectionId) => void
   onSignOut: () => void
 }
 
-export function AppSidebar({ activeSectionId, onSectionChange, onSignOut }: AppSidebarProps) {
-  const experienceProgress =
-    (currentUser.currentExperience / currentUser.nextLevelExperience) * 100
+export function AppSidebar({ user, activeSectionId, onSectionChange, onSignOut }: AppSidebarProps) {
+  const { xpCurrent, xpNeeded, percent } = xpProgress(user.experiencePoints, user.level)
+  const initials = user.firstName.charAt(0).toUpperCase() + user.lastName.charAt(0).toUpperCase()
 
   return (
     <aside className="app-sidebar">
       <a href="#overview" className="brand-name dashboard-brand" aria-label="SkillSwap dashboard">
-        <IonIcon iconName="infinite-outline" />
+        <img src={logo} alt="" className="brand-logo" aria-hidden="true" />
         SkillSwap
       </a>
 
@@ -44,37 +48,37 @@ export function AppSidebar({ activeSectionId, onSectionChange, onSignOut }: AppS
 
       <section className="profile-card">
         <div className="profile-cover" />
-        <img
-          className="profile-avatar large"
-          src={currentUser.avatarUrl}
-          alt={`${currentUser.firstName} ${currentUser.lastName}`}
-        />
-        <h2>
-          {currentUser.firstName} {currentUser.lastName}
-        </h2>
-        <p>{currentUser.field}</p>
+        {user.avatarUrl ? (
+          <img
+            className="profile-avatar large"
+            src={user.avatarUrl}
+            alt={`${user.firstName} ${user.lastName}`}
+          />
+        ) : (
+          <div className="profile-avatar large profile-avatar-initials">
+            {initials}
+          </div>
+        )}
+        <h2>{user.firstName} {user.lastName}</h2>
+        <p>{user.accountType}</p>
         <span className="level-pill">
           <IonIcon iconName="shield-checkmark-outline" />
-          Niveau {currentUser.level}
+          Niveau {user.level}
         </span>
         <div className="xp-label">
-          <span>
-            {currentUser.currentExperience} / {currentUser.nextLevelExperience} XP
-          </span>
+          <span>{xpCurrent} / {xpNeeded} XP</span>
         </div>
         <div className="progress-track" aria-label="Progression en expérience">
-          <span style={{ width: `${experienceProgress}%` }} />
+          <span style={{ width: `${percent}%` }} />
         </div>
         <div className="sidebar-badges">
           <div className="sidebar-badges-header">
             <span>Mes badges</span>
           </div>
           <div className="sidebar-badges-row">
-            {badges.map((badge) => (
-              <span key={badge.title} className="sidebar-badge-icon" title={badge.title}>
-                <IonIcon iconName={badge.iconName} />
-              </span>
-            ))}
+            <span className="sidebar-badge-icon" title="Étudiant actif">
+              <IonIcon iconName="school-outline" />
+            </span>
           </div>
         </div>
       </section>

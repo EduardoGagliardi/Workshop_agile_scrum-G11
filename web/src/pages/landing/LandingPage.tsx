@@ -1,4 +1,5 @@
 import heroImage from '../../assets/hero.png'
+import logo from '../../assets/logo.png'
 import { IonIcon } from '../../shared/IonIcon'
 
 type LandingPageProps = {
@@ -48,7 +49,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
     <main className="landing-page">
       <header className="top-nav">
         <a href="#home" className="brand-name" aria-label="SkillSwap home">
-          <IonIcon iconName="infinite-outline" />
+          <img src={logo} alt="" className="brand-logo" aria-hidden="true" />
           SkillSwap
         </a>
         <nav className="nav-links" aria-label="Navigation principale">
