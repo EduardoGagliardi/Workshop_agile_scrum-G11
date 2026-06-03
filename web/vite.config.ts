@@ -7,4 +7,7 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['ionicons'],
   },
+  build: {
+    chunkSizeWarningLimit: 600,
+  },
 })
