@@ -15,6 +15,7 @@ import {
   languageOutline,
   libraryOutline,
   lockClosedOutline,
+  moonOutline,
   logoPython,
   logoReact,
   notificationsOutline,
@@ -31,6 +32,7 @@ import {
   shareSocialOutline,
   shieldCheckmarkOutline,
   sparklesOutline,
+  sunnyOutline,
   timeOutline,
   trophyOutline,
 } from 'ionicons/icons'
@@ -51,6 +53,7 @@ addIcons({
   languageOutline,
   libraryOutline,
   lockClosedOutline,
+  moonOutline,
   logoPython,
   logoReact,
   notificationsOutline,
@@ -67,6 +70,7 @@ addIcons({
   shareSocialOutline,
   shieldCheckmarkOutline,
   sparklesOutline,
+  sunnyOutline,
   timeOutline,
   trophyOutline,
 })

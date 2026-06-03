@@ -1,6 +1,7 @@
 import heroImage from '../../assets/hero.png'
 import logo from '../../assets/logo.png'
 import { IonIcon } from '../../shared/IonIcon'
+import { ThemeToggleButton } from '../../shared/ThemeToggleButton'
 
 type LandingPageProps = {
   onNavigate: (view: 'landing' | 'sign-in' | 'sign-up' | 'dashboard') => void
@@ -60,9 +61,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           ))}
         </nav>
         <div className="nav-actions">
-          <button type="button" className="help-button" aria-label="Aide">
-            <IonIcon iconName="help-outline" />
-          </button>
+          <ThemeToggleButton />
           <button type="button" className="ghost-button" onClick={() => onNavigate('sign-in')}>
             Connexion
           </button>

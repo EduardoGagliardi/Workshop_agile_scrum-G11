@@ -4,6 +4,9 @@ import { defineCustomElements } from 'ionicons/loader'
 import { ConfigError } from './ConfigError.tsx'
 import { isSupabaseConfigured } from './lib/supabaseClient'
 import './registerIonIcons'
+import { initializeTheme } from './shared/theme'
+
+initializeTheme()
 import './index.css'
 import './App.css'
 import App from './App.tsx'

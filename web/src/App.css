@@ -26,6 +26,23 @@
   --radius-pill: 999px;
 }
 
+[data-theme='dark'] {
+  --blue: #4d8bff;
+  --blue-hover: #6b9fff;
+  --blue-dark: #e8f0ff;
+  --blue-light: #1a2749;
+  --text: #e8f0ff;
+  --text-muted: #a8b8e8;
+  --text-light: #7a8ec4;
+  --border: #2a3f6f;
+  --surface: #141f3d;
+  --soft-surface: #1a2749;
+  --bg: #0d1529;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 18px 45px rgba(0, 0, 0, 0.45);
+}
+
 /* ─── Reset ─────────────────────────────────────────────────── */
 *,
 *::before,
@@ -162,16 +179,23 @@ ol {
   color: var(--blue-dark);
 }
 
-.help-button {
+.theme-toggle-button {
   display: grid;
   place-items: center;
   width: 36px;
   height: 36px;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  background: transparent;
+  background: var(--soft-surface);
   color: var(--text-muted);
-  font-size: 1.1rem;
+  font-size: 1.15rem;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.theme-toggle-button:hover {
+  background: var(--blue-light);
+  color: var(--blue);
+  border-color: var(--blue);
 }
 
 .full-width {
@@ -226,9 +250,20 @@ ol {
   padding: 0.75rem 1.1rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.92);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(12px);
   box-shadow: var(--shadow-sm);
+}
+
+[data-theme='dark'] .social-proof-avatars img {
+  border-color: var(--surface);
+}
+
+[data-theme='dark'] .hero-image-card,
+[data-theme='dark'] .white-card,
+[data-theme='dark'] .how-it-works-card {
+  background: var(--surface);
+  border-color: var(--border);
 }
 
 .nav-links {
