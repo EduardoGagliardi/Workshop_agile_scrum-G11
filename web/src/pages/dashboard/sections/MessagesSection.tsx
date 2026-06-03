@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useMessagesRealtime } from '../../../hooks/useMessagesRealtime'
+import { findOrCreateConversation } from '../../../lib/conversations'
 import { supabase } from '../../../lib/supabaseClient'
 import { IonIcon } from '../../../shared/IonIcon'
 import type { UserProfile } from '../../../types'
@@ -24,9 +26,19 @@ type Message = {
   users: { first_name: string; last_name: string } | null
 }
 
-type Props = { user: UserProfile }
+type Props = {
+  user: UserProfile
+  initialTargetUserId?: string | null
+  onClearInitialTarget?: () => void
+  onViewProfile: (userId: string) => void
+}
 
-export function MessagesSection({ user }: Props) {
+export function MessagesSection({
+  user,
+  initialTargetUserId,
+  onClearInitialTarget,
+  onViewProfile,
+}: Props) {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -38,7 +50,7 @@ export function MessagesSection({ user }: Props) {
   const [searchResults, setSearchResults] = useState<{ id: string; first_name: string; last_name: string }[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  async function fetchConversations() {
+  const fetchConversations = useCallback(async () => {
     const { data: participations } = await supabase
       .from('conversation_participants')
       .select('conversation_id')
@@ -82,11 +94,11 @@ export function MessagesSection({ user }: Props) {
     )
 
     setConversations(sorted)
-    if (!selectedId && sorted.length > 0) setSelectedId(sorted[0].id)
+    setSelectedId((current) => current ?? sorted[0]?.id ?? null)
     setLoading(false)
-  }
+  }, [user.id])
 
-  async function fetchMessages(convId: string) {
+  const fetchMessages = useCallback(async (convId: string) => {
     const { data } = await supabase
       .from('messages')
       .select('id, content, created_at, sender_user_id, users!sender_user_id(first_name, last_name)')
@@ -95,23 +107,70 @@ export function MessagesSection({ user }: Props) {
       .order('created_at', { ascending: true })
     setMessages((data as unknown as Message[]) ?? [])
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
-  }
+  }, [])
 
-  useEffect(() => { fetchConversations() }, [user.id])
-  useEffect(() => { if (selectedId) fetchMessages(selectedId) }, [selectedId])
+  const refreshMessagesView = useCallback(() => {
+    fetchConversations()
+    if (selectedId) fetchMessages(selectedId)
+  }, [fetchConversations, fetchMessages, selectedId])
+
+  useEffect(() => {
+    fetchConversations()
+  }, [fetchConversations])
+
+  useEffect(() => {
+    if (selectedId) fetchMessages(selectedId)
+  }, [selectedId, fetchMessages])
+
+  useMessagesRealtime(user.id, refreshMessagesView)
+
+  useEffect(() => {
+    if (!initialTargetUserId) return
+
+    async function openTargetConversation(targetUserId: string) {
+      const conversationId = await findOrCreateConversation(user.id, targetUserId)
+      if (conversationId) {
+        setSelectedId(conversationId)
+        await fetchConversations()
+        await fetchMessages(conversationId)
+      }
+      onClearInitialTarget?.()
+    }
+
+    openTargetConversation(initialTargetUserId)
+  }, [initialTargetUserId, user.id, fetchConversations, fetchMessages, onClearInitialTarget])
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault()
     if (!newMessage.trim() || !selectedId) return
     setSendLoading(true)
-    await supabase.from('messages').insert({
-      conversation_id: selectedId,
-      sender_user_id: user.id,
-      content: newMessage.trim(),
-    })
+    const content = newMessage.trim()
     setNewMessage('')
+    const { data: insertedMessage } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: selectedId,
+        sender_user_id: user.id,
+        content,
+      })
+      .select('id, content, created_at, sender_user_id')
+      .single()
+
+    if (insertedMessage) {
+      setMessages((previous) => {
+        if (previous.some((message) => message.id === insertedMessage.id)) return previous
+        return [
+          ...previous,
+          {
+            ...insertedMessage,
+            users: { first_name: user.firstName, last_name: user.lastName },
+          },
+        ]
+      })
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    }
+
     setSendLoading(false)
-    fetchMessages(selectedId)
     fetchConversations()
   }
 
@@ -127,17 +186,13 @@ export function MessagesSection({ user }: Props) {
   }
 
   async function startConversation(targetId: string) {
-    const { data: conv } = await supabase.from('conversations').insert({}).select().single()
-    if (!conv) return
-    await supabase.from('conversation_participants').insert([
-      { conversation_id: conv.id, user_id: user.id },
-      { conversation_id: conv.id, user_id: targetId },
-    ])
+    const conversationId = await findOrCreateConversation(user.id, targetId)
+    if (!conversationId) return
     setShowNewConv(false)
     setUserSearch('')
     setSearchResults([])
     await fetchConversations()
-    setSelectedId(conv.id)
+    setSelectedId(conversationId)
   }
 
   const selectedConv = conversations.find(c => c.id === selectedId)
@@ -170,12 +225,21 @@ export function MessagesSection({ user }: Props) {
               onChange={e => { setUserSearch(e.target.value); searchUsers(e.target.value) }}
             />
             {searchResults.map(u => (
-              <button key={u.id} type="button" className="user-search-result" onClick={() => startConversation(u.id)}>
-                <div className="profile-avatar profile-avatar-initials" style={{ width: 32, height: 32, fontSize: '0.75rem' }}>
-                  {u.first_name.charAt(0)}{u.last_name.charAt(0)}
-                </div>
-                {u.first_name} {u.last_name}
-              </button>
+              <div key={u.id} className="user-search-result-row">
+                <button type="button" className="user-search-result" onClick={() => startConversation(u.id)}>
+                  <div className="profile-avatar profile-avatar-initials" style={{ width: 32, height: 32, fontSize: '0.75rem' }}>
+                    {u.first_name.charAt(0)}{u.last_name.charAt(0)}
+                  </div>
+                  {u.first_name} {u.last_name}
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button user-search-profile-link"
+                  onClick={() => onViewProfile(u.id)}
+                >
+                  Profil
+                </button>
+              </div>
             ))}
           </div>
         )}
@@ -220,10 +284,16 @@ export function MessagesSection({ user }: Props) {
         ) : (
           <>
             <div className="thread-header">
-              <div className="profile-avatar profile-avatar-initials conv-avatar">
-                {selectedConv.otherUser.first_name.charAt(0)}{selectedConv.otherUser.last_name.charAt(0)}
-              </div>
-              <strong>{selectedConv.otherUser.first_name} {selectedConv.otherUser.last_name}</strong>
+              <button
+                type="button"
+                className="thread-header-profile"
+                onClick={() => onViewProfile(selectedConv.otherUser.id)}
+              >
+                <div className="profile-avatar profile-avatar-initials conv-avatar">
+                  {selectedConv.otherUser.first_name.charAt(0)}{selectedConv.otherUser.last_name.charAt(0)}
+                </div>
+                <strong>{selectedConv.otherUser.first_name} {selectedConv.otherUser.last_name}</strong>
+              </button>
             </div>
 
             <div className="thread-messages">

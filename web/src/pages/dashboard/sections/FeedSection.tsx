@@ -18,7 +18,10 @@ type FeedSession = {
   session_registrations: { user_id: string }[]
 }
 
-type Props = { user: UserProfile }
+type Props = {
+  user: UserProfile
+  onViewProfile: (userId: string) => void
+}
 
 const TYPE_COLORS: Record<string, string> = {
   'Cours rapide': 'purple',
@@ -32,7 +35,7 @@ function formatDate(iso: string) {
   })
 }
 
-export function FeedSection({ user }: Props) {
+export function FeedSection({ user, onViewProfile }: Props) {
   const [sessions, setSessions] = useState<FeedSession[]>([])
   const [loading, setLoading] = useState(true)
   const [registering, setRegistering] = useState<string | null>(null)
@@ -100,7 +103,12 @@ export function FeedSection({ user }: Props) {
             return (
               <article key={session.id} className="feed-card dashboard-card">
                 <div className="feed-card-top">
-                  <div className="feed-host-info">
+                  <button
+                    type="button"
+                    className="feed-host-info feed-host-info-clickable"
+                    disabled={isHost}
+                    onClick={() => onViewProfile(session.host_id)}
+                  >
                     {session.users?.avatar_url ? (
                       <img className="profile-avatar" src={session.users.avatar_url} alt="" />
                     ) : (
@@ -111,7 +119,7 @@ export function FeedSection({ user }: Props) {
                     <span>
                       {session.users ? `${session.users.first_name} ${session.users.last_name}` : 'Animateur'}
                     </span>
-                  </div>
+                  </button>
                   <span className={`session-icon ${accentClass}`}>{session.type.charAt(0)}</span>
                 </div>
 

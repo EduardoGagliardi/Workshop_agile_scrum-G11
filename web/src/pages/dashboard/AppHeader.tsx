@@ -4,10 +4,17 @@ import type { UserProfile } from '../../types'
 
 type AppHeaderProps = {
   user: UserProfile
+  unreadMessageCount: number
+  notificationCount: number
   onOpenSheet: (sheetName: 'messages' | 'notifications') => void
 }
 
-export function AppHeader({ user, onOpenSheet }: AppHeaderProps) {
+export function AppHeader({
+  user,
+  unreadMessageCount,
+  notificationCount,
+  onOpenSheet,
+}: AppHeaderProps) {
   const initials = user.firstName.charAt(0).toUpperCase() + user.lastName.charAt(0).toUpperCase()
 
   return (
@@ -26,18 +33,24 @@ export function AppHeader({ user, onOpenSheet }: AppHeaderProps) {
         <button
           type="button"
           className="icon-button"
-          aria-label="Ouvrir les notifications"
+          aria-label={`Ouvrir les notifications${notificationCount > 0 ? `, ${notificationCount} nouvelle${notificationCount > 1 ? 's' : ''}` : ''}`}
           onClick={() => onOpenSheet('notifications')}
         >
           <IonIcon iconName="notifications-outline" />
+          {notificationCount > 0 && (
+            <span aria-hidden="true">{notificationCount > 9 ? '9+' : notificationCount}</span>
+          )}
         </button>
         <button
           type="button"
           className="icon-button"
-          aria-label="Ouvrir les messages"
+          aria-label={`Ouvrir les messages${unreadMessageCount > 0 ? `, ${unreadMessageCount} non lu${unreadMessageCount > 1 ? 's' : ''}` : ''}`}
           onClick={() => onOpenSheet('messages')}
         >
           <IonIcon iconName="chatbox-ellipses-outline" />
+          {unreadMessageCount > 0 && (
+            <span aria-hidden="true">{unreadMessageCount > 9 ? '9+' : unreadMessageCount}</span>
+          )}
         </button>
         <article className="user-summary-card">
           {user.avatarUrl ? (

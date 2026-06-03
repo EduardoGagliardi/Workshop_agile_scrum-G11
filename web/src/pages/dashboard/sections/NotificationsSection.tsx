@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useNotificationsRealtime } from '../../../hooks/useNotificationsRealtime'
 import { supabase } from '../../../lib/supabaseClient'
 import { IonIcon } from '../../../shared/IonIcon'
 import type { UserProfile } from '../../../types'
@@ -25,7 +26,7 @@ export function NotificationsSection({ user }: Props) {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true)
     const [{ data: requests }, { data: registrations }] = await Promise.all([
       supabase
@@ -45,9 +46,13 @@ export function NotificationsSection({ user }: Props) {
     setContactRequests((requests as unknown as ContactRequest[]) ?? [])
     setSessionEvents((registrations as unknown as SessionEvent[]) ?? [])
     setLoading(false)
-  }
+  }, [user.id])
 
-  useEffect(() => { fetchData() }, [user.id])
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  useNotificationsRealtime(user.id, fetchData)
 
   async function handleContactRequest(requestId: string, accept: boolean) {
     setActionLoading(requestId)

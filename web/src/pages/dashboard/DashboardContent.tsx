@@ -13,6 +13,7 @@ import { BadgesSection } from './sections/BadgesSection'
 import { ProfileSection } from './sections/ProfileSection'
 import { SettingsSection } from './sections/SettingsSection'
 import { FeedSection } from './sections/FeedSection'
+import { PublicUserProfileSection } from './sections/PublicUserProfileSection'
 
 type OverviewSession = {
   id: string
@@ -27,19 +28,59 @@ type DashboardContentProps = {
   user: UserProfile
   onUserUpdate: (user: UserProfile) => void
   activeSectionId: DashboardSectionId
+  viewingUserId: string | null
+  messageTargetUserId: string | null
   onNavigate: (id: DashboardSectionId) => void
+  onViewProfile: (userId: string) => void
+  onCloseProfile: () => void
+  onOpenOwnProfile: () => void
+  onOpenMessages: (targetUserId: string) => void
+  onClearMessageTarget: () => void
 }
 
-export function DashboardContent({ user, onUserUpdate, activeSectionId, onNavigate }: DashboardContentProps) {
+export function DashboardContent({
+  user,
+  onUserUpdate,
+  activeSectionId,
+  viewingUserId,
+  messageTargetUserId,
+  onNavigate,
+  onViewProfile,
+  onCloseProfile,
+  onOpenOwnProfile,
+  onOpenMessages,
+  onClearMessageTarget,
+}: DashboardContentProps) {
+  if (viewingUserId) {
+    return (
+      <PublicUserProfileSection
+        currentUser={user}
+        profileUserId={viewingUserId}
+        onBack={onCloseProfile}
+        onOpenOwnProfile={onOpenOwnProfile}
+        onOpenMessages={onOpenMessages}
+      />
+    )
+  }
+
   if (activeSectionId === 'sessions') return <SessionsSection user={user} />
   if (activeSectionId === 'skills') return <SkillsSection user={user} />
-  if (activeSectionId === 'search') return <SearchSection />
-  if (activeSectionId === 'messages') return <MessagesSection user={user} />
+  if (activeSectionId === 'search') return <SearchSection onViewProfile={onViewProfile} />
+  if (activeSectionId === 'messages') {
+    return (
+      <MessagesSection
+        user={user}
+        initialTargetUserId={messageTargetUserId}
+        onClearInitialTarget={onClearMessageTarget}
+        onViewProfile={onViewProfile}
+      />
+    )
+  }
   if (activeSectionId === 'notifications') return <NotificationsSection user={user} />
   if (activeSectionId === 'badges') return <BadgesSection user={user} />
   if (activeSectionId === 'friends') return <ProfileSection user={user} onUserUpdate={onUserUpdate} />
   if (activeSectionId === 'settings') return <SettingsSection user={user} onUserUpdate={onUserUpdate} />
-  if (activeSectionId === 'feed') return <FeedSection user={user} />
+  if (activeSectionId === 'feed') return <FeedSection user={user} onViewProfile={onViewProfile} />
 
   return <OverviewSection user={user} onNavigate={onNavigate} />
 }

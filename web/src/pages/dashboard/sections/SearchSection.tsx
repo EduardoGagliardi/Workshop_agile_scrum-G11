@@ -18,7 +18,11 @@ type UserResult = {
   skills: { role: string; level: string; skill_name: string }[]
 }
 
-export function SearchSection() {
+type Props = {
+  onViewProfile: (userId: string) => void
+}
+
+export function SearchSection({ onViewProfile }: Props) {
   const [query, setQuery] = useState('')
   const [skills, setSkills] = useState<SkillResult[]>([])
   const [users, setUsers] = useState<UserResult[]>([])
@@ -140,7 +144,12 @@ export function SearchSection() {
             {users.map(u => {
               const initials = u.first_name.charAt(0) + u.last_name.charAt(0)
               return (
-                <div key={u.id} className="search-result-card">
+                <button
+                  key={u.id}
+                  type="button"
+                  className="search-result-card search-result-card-clickable"
+                  onClick={() => onViewProfile(u.id)}
+                >
                   {u.avatar_url ? (
                     <img className="profile-avatar" src={u.avatar_url} alt={`${u.first_name} ${u.last_name}`} />
                   ) : (
@@ -161,7 +170,7 @@ export function SearchSection() {
                       </div>
                     )}
                   </div>
-                </div>
+                </button>
               )
             })}
           </div>

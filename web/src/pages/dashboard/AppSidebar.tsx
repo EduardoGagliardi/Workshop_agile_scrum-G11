@@ -7,11 +7,31 @@ import { xpProgress } from '../../types'
 type AppSidebarProps = {
   user: UserProfile
   activeSectionId: DashboardSectionId
+  unreadMessageCount: number
+  notificationCount: number
   onSectionChange: (sectionId: DashboardSectionId) => void
   onSignOut: () => void
 }
 
-export function AppSidebar({ user, activeSectionId, onSectionChange, onSignOut }: AppSidebarProps) {
+function sectionBadgeCount(
+  sectionId: DashboardSectionId,
+  unreadMessageCount: number,
+  notificationCount: number,
+  staticCount?: number,
+) {
+  if (sectionId === 'messages' && unreadMessageCount > 0) return unreadMessageCount
+  if (sectionId === 'notifications' && notificationCount > 0) return notificationCount
+  return staticCount
+}
+
+export function AppSidebar({
+  user,
+  activeSectionId,
+  unreadMessageCount,
+  notificationCount,
+  onSectionChange,
+  onSignOut,
+}: AppSidebarProps) {
   const { xpCurrent, xpNeeded, percent } = xpProgress(user.experiencePoints, user.level)
   const initials = user.firstName.charAt(0).toUpperCase() + user.lastName.charAt(0).toUpperCase()
 
@@ -23,18 +43,27 @@ export function AppSidebar({ user, activeSectionId, onSectionChange, onSignOut }
       </a>
 
       <nav className="sidebar-nav" aria-label="Navigation du tableau de bord">
-        {navigationSections.map((section) => (
-          <button
-            key={section.id}
-            type="button"
-            className={activeSectionId === section.id ? 'sidebar-link active' : 'sidebar-link'}
-            onClick={() => onSectionChange(section.id)}
-          >
-            <IonIcon iconName={section.iconName} />
-            <span>{section.label}</span>
-            {section.badgeCount ? <strong>{section.badgeCount}</strong> : null}
-          </button>
-        ))}
+        {navigationSections.map((section) => {
+          const badgeCount = sectionBadgeCount(
+            section.id,
+            unreadMessageCount,
+            notificationCount,
+            section.badgeCount,
+          )
+
+          return (
+            <button
+              key={section.id}
+              type="button"
+              className={activeSectionId === section.id ? 'sidebar-link active' : 'sidebar-link'}
+              onClick={() => onSectionChange(section.id)}
+            >
+              <IonIcon iconName={section.iconName} />
+              <span>{section.label}</span>
+              {badgeCount ? <strong>{badgeCount > 9 ? '9+' : badgeCount}</strong> : null}
+            </button>
+          )
+        })}
       </nav>
 
       <div className="sidebar-promo-card">
